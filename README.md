@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/banner.png" alt="APR Emu Updater" width="100%">
+</p>
+
 # APR Emu Updater
 
 A standalone PS5 payload that does one thing: keep **APR Emu**
@@ -11,16 +15,49 @@ Send `apr_emu_updater.elf` to the console's ELF loader on port 9021.
 
 ## Where the versions come from
 
-The build list is `manifest.json` under the Pegasus DL repository:
+The builds ship in this repository, under `apr-emu/`, and the payload reads the
+list from:
 
 ```text
-https://raw.githubusercontent.com/tsuramatsu1/pegasus-dl/main/apr-emu/manifest.json
+https://raw.githubusercontent.com/tsuramatsu1/apr-emu-updater/main/apr-emu/builds.json
 ```
 
-Each entry names its SPRX relative to that same directory, so the current release
-(`"id": "0.3.6.2-release"`, `"file": "libSceAmpr.sprx-0.3.6.2"`) is fetched from
-`.../apr-emu/libSceAmpr.sprx-0.3.6.2` and checked against the size and SHA-256 the
-manifest declares before anything is written.
+Builds are grouped under the version they belong to, newest version first, with
+each version's release build ahead of its debug build:
+
+```json
+{
+  "builds": "apr-emu",
+  "buildsVersion": 2,
+  "latest": { "release": "0.3.6.2", "debug": "0.3.6.2" },
+  "versions": [
+    {
+      "version": "0.3.6.2",
+      "builds": [
+        {
+          "build": "release",
+          "file": "libSceAmpr.sprx-0.3.6.2",
+          "bytes": 225094,
+          "sha256": "aa574cbe7624f611d5858f8a62771726d5613aa58787095f36c98f852406f4e1"
+        }
+      ]
+    }
+  ]
+}
+```
+
+`file` is relative to the same directory as `builds.json`, and the download is
+checked against `bytes` and `sha256` before anything is written. The `builds`
+name and `buildsVersion` are both required, so a differently shaped document is
+refused rather than half-read.
+
+The file is generated from the assets beside it, so sizes and hashes are never
+hand-maintained:
+
+```sh
+python3 tools/make_builds.py            # rewrite it from the assets
+python3 tools/make_builds.py --check    # fail if it is out of date
+```
 
 To point somewhere else, write the base URL — the directory, not the
-`manifest.json` — into `/data/apr-emu-updater/manifest-base-url` and relaunch.
+`builds.json` — into `/data/apr-emu-updater/builds-base-url` and relaunch.

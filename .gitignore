@@ -1,5 +1,11 @@
-# This repository publishes the payload and its README, nothing else.
+# This repository publishes the payload, the APR Emu assets it installs, the
+# README and the image the README shows. Everything else -- sources, build
+# output, tools -- stays local.
 /*
 !.gitignore
 !README.md
 !apr_emu_updater.elf
+!apr-emu/
+!assets/
+assets/*
+!assets/banner.png
