@@ -1,0 +1,5 @@
+# This repository publishes the payload and its README, nothing else.
+/*
+!.gitignore
+!README.md
+!apr_emu_updater.elf
