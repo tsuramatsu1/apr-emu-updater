@@ -51,13 +51,5 @@ checked against `bytes` and `sha256` before anything is written. The `builds`
 name and `buildsVersion` are both required, so a differently shaped document is
 refused rather than half-read.
 
-The file is generated from the assets beside it, so sizes and hashes are never
-hand-maintained:
-
-```sh
-python3 tools/make_builds.py            # rewrite it from the assets
-python3 tools/make_builds.py --check    # fail if it is out of date
-```
-
 To point somewhere else, write the base URL — the directory, not the
 `builds.json` — into `/data/apr-emu-updater/builds-base-url` and relaunch.
