@@ -4,10 +4,13 @@
 
 # APR Emu Updater
 
-A standalone PS5 payload that keeps **APR Emu**
-(`fakelib/libSceAmpr.sprx`) up to date on installed titles. It serves a small
-web interface on the console and adds a tile to the **home screen** that opens
-that interface in the console browser.
+Backported games on a jailbroken ps5 rely on a file called **APR Emu**
+(`libSceAmpr.sprx`). Different games run best with different versions of it, and
+swapping that file by hand means editing game images.
+
+This payload does it for you. It opens a small web page on your ps5 where every
+installed game is listed with the APR Emu version it is currently using, and you
+pick the version each game should use.
 
 > [!IMPORTANT]
 > **APR Emu Updater must always be loaded.** Add it to your payload autoloader,
@@ -20,51 +23,102 @@ that interface in the console browser.
 
 ## Prerequisites
 
+- A jailbroken ps5 with an ELF loader listening on port 9021.
 - **NanoDNS** must be running.
+- **ShadowMountPlus** for games installed as image files.
 - **APR Emu Updater** must remain loaded at all times. Add it to your payload
-  autoloader, or launch it manually before starting a game.
+  autoloader, or send it manually before starting a game. No need to open the app
+  tile, the updated apr-emu will be remounted when the payload is active.
 
-## Running it
+## How to use it
 
-Send `apr_emu_updater.elf` to the console's ELF loader on port 9021.
+1. **Send `apr_emu_updater.elf` to your ps5**, port 9021, with whatever you
+   normally use to send payloads. Do this every time the console has been turned
+   off, or let your autoloader do it for you.
+
+2. **Watch for the notification.** The ps5 shows:
+
+   ```text
+   APR Emu Updater listening on http://192.168.1.20:6971/
+   ```
+
+   The first time, it also says `Installing APR Emu tile` and then
+   `APR Emu tile installed` — that adds an **APR Emu Updater** tile so you can
+   reach the page later without typing an address.
+
+3. **Open the page.** Either tap the tile on your ps5, or type that address into
+   a phone, tablet or computer on the same network. A phone is easier to type on
+   and works exactly the same.
+
+4. **Pick a game.** Each row shows the APR Emu version that game has now, and
+   whether a newer one is available. Press **Update** for the newest version, or
+   **Reinstall** to choose a specific one, including debug builds.
+
+5. **Wait for it to finish**, then start the game. Leave the payload loaded.
+
+## Good to know
+
+- **Keep the payload loaded.** For games installed as image files the new APR Emu
+  is layered on top of the game while the payload is active. Turn the ps5 off and
+  the layer is gone, so send the payload again before playing. Games installed as
+  folders are changed on disk and stay changed.
+
+- **You do not have to open the tile.** It is only a shortcut to the page. What
+  matters is that the payload is loaded.
+
+- **The version list needs internet.** Versions are fetched once and remembered
+  for ten minutes. If the ps5 cannot reach the internet, your games are still
+  listed but their available versions show as unknown.
+
+- **Nothing is replaced unless it is verified.** Every download is checked
+  against the size and the SHA-256 the version list declares before it is written,
+  and re-checked afterwards.
+
+## If something looks wrong
+
+| What you see | What it means |
+| --- | --- |
+| The tile opens an empty browser page | The payload is not loaded. Send it again, then tap the tile |
+| "Load failed" or no versions listed | The ps5 could not reach the internet. Check that NanoDNS is running |
+| A game says APR Emu is missing | That game has no `libSceAmpr.sprx` to replace, so there is nothing to update |
+| A game is listed as unsupported | Its image is a raw `.ffpfs`, which cannot be overridden |
+| Anything else | Press **Logs** on the page. It shows what the payload did, step by step |
 
 ## Where the versions come from
 
-The builds ship in this repository, under `apr-emu/`, and the payload reads the
-list from:
+The APR Emu builds are in this repository, under `apr-emu/`, and the payload
+reads the list from:
 
 ```text
 https://raw.githubusercontent.com/tsuramatsu1/apr-emu-updater/main/apr-emu/builds.json
 ```
 
-Builds are grouped under the version they belong to, newest version first, with
-each version's release build ahead of its debug build:
+Nothing else is contacted, and nothing is downloaded from anywhere else.
 
-```json
-{
-  "builds": "apr-emu",
-  "buildsVersion": 2,
-  "latest": { "release": "0.3.6.2", "debug": "0.3.6.2" },
-  "versions": [
-    {
-      "version": "0.3.6.2",
-      "builds": [
-        {
-          "build": "release",
-          "file": "libSceAmpr.sprx-0.3.6.2",
-          "bytes": 225094,
-          "sha256": "aa574cbe7624f611d5858f8a62771726d5613aa58787095f36c98f852406f4e1"
-        }
-      ]
-    }
-  ]
-}
+## For developers
+
+`builds.json` lists each version with its file name, byte size and SHA-256,
+grouped by version with the release build ahead of the debug build. It is
+generated from the files beside it, so hashes are never hand-maintained:
+
+```sh
+python3 tools/make_builds.py            # rewrite it from the assets
+python3 tools/make_builds.py --check    # fail if it is out of date
 ```
 
-`file` is relative to the same directory as `builds.json`, and the download is
-checked against `bytes` and `sha256` before anything is written. The `builds`
-name and `buildsVersion` are both required, so a differently shaped document is
-refused rather than half-read.
+To serve the builds from somewhere else, write the base URL — the directory, not
+the `builds.json` — into `/data/apr-emu-updater/builds-base-url` and relaunch.
 
-To point somewhere else, write the base URL — the directory, not the
-`builds.json` — into `/data/apr-emu-updater/builds-base-url` and relaunch.
+Build the payload with the [ps5 payload SDK](https://github.com/ps5-payload-dev/sdk):
+
+```sh
+make                                  # -> apr_emu_updater.elf
+make PORT=6971 TITLE_ID=APRE69710     # change the port or the tile id
+make TILE_CATEGORY=65536              # put the tile in Media instead of the homescreen
+make OPEN_BROWSER=1                   # open the ps5 browser when the payload starts
+make deploy PS5_HOST=192.168.1.20     # send it to the ELF loader
+make -C tests run                     # host tests
+```
+
+`docs/` holds design notes, including the plan for making overrides survive a
+reboot without the payload loaded.
