@@ -94,31 +94,3 @@ https://raw.githubusercontent.com/tsuramatsu1/apr-emu-updater/main/apr-emu/build
 ```
 
 Nothing else is contacted, and nothing is downloaded from anywhere else.
-
-## For developers
-
-`builds.json` lists each version with its file name, byte size and SHA-256,
-grouped by version with the release build ahead of the debug build. It is
-generated from the files beside it, so hashes are never hand-maintained:
-
-```sh
-python3 tools/make_builds.py            # rewrite it from the assets
-python3 tools/make_builds.py --check    # fail if it is out of date
-```
-
-To serve the builds from somewhere else, write the base URL — the directory, not
-the `builds.json` — into `/data/apr-emu-updater/builds-base-url` and relaunch.
-
-Build the payload with the [ps5 payload SDK](https://github.com/ps5-payload-dev/sdk):
-
-```sh
-make                                  # -> apr_emu_updater.elf
-make PORT=6971 TITLE_ID=APRE69710     # change the port or the tile id
-make TILE_CATEGORY=65536              # put the tile in Media instead of the homescreen
-make OPEN_BROWSER=1                   # open the ps5 browser when the payload starts
-make deploy PS5_HOST=192.168.1.20     # send it to the ELF loader
-make -C tests run                     # host tests
-```
-
-`docs/` holds design notes, including the plan for making overrides survive a
-reboot without the payload loaded.
