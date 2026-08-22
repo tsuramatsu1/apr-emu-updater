@@ -4,10 +4,19 @@
 
 # APR Emu Updater
 
-A standalone PS5 payload that does one thing: keep **APR Emu**
+A standalone PS5 payload that keeps **APR Emu**
 (`fakelib/libSceAmpr.sprx`) up to date on installed titles. It serves a small
-web interface on the console and puts a tile on the **home screen** that opens
+web interface on the console and adds a tile to the **home screen** that opens
 that interface in the console browser.
+
+> [!IMPORTANT]
+> **APR Emu Updater must always be loaded.** Add it to your payload autoloader,
+> or launch it manually before starting a game, so the APR Emu override remains
+> mounted.
+>
+> Despite its name, **APR Emu Updater does not update APR Emu itself**. Instead,
+> it overrides the `libSceAmpr.sprx` that games use at runtime, allowing them to
+> use the selected version while the payload is loaded.
 
 ## Running it
 
