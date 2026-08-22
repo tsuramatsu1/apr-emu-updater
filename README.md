@@ -4,7 +4,7 @@
 
 # APR Emu Updater
 
-Backported games on a jailbroken ps5 rely on a file called **APR Emu**
+Some games on a jailbroken ps5 rely on a file called **APR Emu**
 (`libSceAmpr.sprx`). Different games run best with different versions of it, and
 swapping that file by hand means editing game images.
 
