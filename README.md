@@ -18,6 +18,12 @@ that interface in the console browser.
 > it overrides the `libSceAmpr.sprx` that games use at runtime, allowing them to
 > use the selected version while the payload is loaded.
 
+## Prerequisites
+
+- **NanoDNS** must be running.
+- **APR Emu Updater** must remain loaded at all times. Add it to your payload
+  autoloader, or launch it manually before starting a game.
+
 ## Running it
 
 Send `apr_emu_updater.elf` to the console's ELF loader on port 9021.
