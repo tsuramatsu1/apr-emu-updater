@@ -3,10 +3,60 @@
   "buildsVersion": 2,
   "repository": "https://github.com/tsuramatsu1/apr-emu-updater",
   "latest": {
-    "release": "0.3.6.2",
-    "debug": "0.3.6.2"
+    "release": "0.3.6.5-512kb",
+    "debug": "0.3.6.4"
   },
   "versions": [
+    {
+      "version": "0.3.6.5-512kb",
+      "builds": [
+        {
+          "build": "release",
+          "file": "libSceAmpr.sprx-0.3.6.5-512kb",
+          "bytes": 253094,
+          "sha256": "36eda6fbf7bee8d123209f3ce03cce59b421d999c7486acdedf6183335b239d7"
+        }
+      ]
+    },
+    {
+      "version": "0.3.6.5-2mb",
+      "builds": [
+        {
+          "build": "release",
+          "file": "libSceAmpr.sprx-0.3.6.5-2mb",
+          "bytes": 253094,
+          "sha256": "eed6fe9851643d1fa2819e15a42ebc4691e107931eaa8c1fa94ce53bad257574"
+        }
+      ]
+    },
+    {
+      "version": "0.3.6.5-1mb",
+      "builds": [
+        {
+          "build": "release",
+          "file": "libSceAmpr.sprx-0.3.6.5-1mb",
+          "bytes": 253094,
+          "sha256": "2a6368929cbcf50724c0153a811aa89c4c4620f88d2dc400969a488d9f5bf65e"
+        }
+      ]
+    },
+    {
+      "version": "0.3.6.4",
+      "builds": [
+        {
+          "build": "release",
+          "file": "libSceAmpr.sprx-0.3.6.4",
+          "bytes": 236278,
+          "sha256": "0128962502b95e2aab03a3c09f39cc396e8d4e2841b0de2ffaa7d9a58a35f4a0"
+        },
+        {
+          "build": "debug",
+          "file": "libSceAmpr.sprx-0.3.6.4-debug",
+          "bytes": 389734,
+          "sha256": "2d7864046ffc03200c27edc9b5398c48224e5cd129eb5322300aa96ce1492d6d"
+        }
+      ]
+    },
     {
       "version": "0.3.6.2",
       "builds": [
