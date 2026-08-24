@@ -62,37 +62,38 @@ jobs:
         id: rewrite
         run: |
           python3 - <<'PY'
-          import hashlib, json, os
+          import json, os
 
           tag = os.environ["TAG"]
+          stamp = os.environ["RELEASE_DATE"]
           asset = "apr_emu_updater.elf"
-          url = ("https://github.com/${{ github.repository }}"
-                 "/releases/download/%s/%s" % (tag, asset))
-          digest = hashlib.sha256(open(os.path.join("release", asset), "rb").read())
-          checksum = digest.hexdigest().upper()
+          repo = "${{ github.repository }}"
+          url = "https://github.com/%s/releases/download/%s/%s" % (repo, tag, asset)
 
           path = "apr_emu_manifest.json"
           with open(path, encoding="utf-8") as handle:
               before = handle.read()
           doc = json.loads(before)
+          if not isinstance(doc, list):
+              raise SystemExit("%s should be an array of payload entries" % path)
 
-          entries = [e for e in doc.get("payloads") or [] if e.get("filename") == asset]
+          entries = [e for e in doc if e.get("filename") == asset]
           if not entries:
-              raise SystemExit("no payload entry for %s in %s" % (asset, path))
+              raise SystemExit("no entry for %s in %s" % (asset, path))
           for entry in entries:
               entry["url"] = url
+              entry["source_direct"] = url
+              entry["source"] = "https://github.com/%s/releases" % repo
               entry["version"] = tag
-              entry["checksum"] = checksum
-              entry["last_update"] = os.environ["RELEASE_DATE"]
+              entry["last_update"] = stamp
 
           after = json.dumps(doc, indent=2) + "\n"
           with open(path, "w", encoding="utf-8", newline="\n") as handle:
               handle.write(after)
 
-          # Pinning the URL to the tag rather than releases/latest keeps the URL
-          # and the checksum describing the same bytes.
-          print("%s -> %s" % (asset, url))
-          print("checksum %s" % checksum)
+          # Pinning to the tag rather than releases/latest keeps url, version and
+          # last_update describing the same release.
+          print("%s %s (%s) -> %s" % (asset, tag, stamp, url))
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
               out.write("changed=%s\n" % ("1" if after != before else "0"))
           PY
