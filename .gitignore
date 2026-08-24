@@ -10,3 +10,4 @@
 assets/*
 !assets/banner.png
 !apr_emu_manifest.json
+!.github/

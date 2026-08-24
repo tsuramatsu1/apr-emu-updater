@@ -1,0 +1,89 @@
+name: Deploy manifest to Pages
+
+# Publishes apr_emu_manifest.json to GitHub Pages and nothing else, so the
+# payload can read the version list from a plain https host.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apr_emu_manifest.json
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # A manifest that does not parse, or that names a build which is not in the
+      # repository, would leave every console unable to install. Catch it here
+      # rather than after it is live.
+      - name: Check the manifest
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          path = "apr_emu_manifest.json"
+          if not os.path.exists(path):
+              sys.exit("%s is missing" % path)
+
+          with open(path, encoding="utf-8") as handle:
+              doc = json.load(handle)
+
+          if doc.get("builds") != "apr-emu":
+              sys.exit("not an apr-emu manifest: builds=%r" % doc.get("builds"))
+          if doc.get("buildsVersion") != 2:
+              sys.exit("unsupported buildsVersion: %r" % doc.get("buildsVersion"))
+
+          versions = doc.get("versions") or []
+          entries = [(g.get("version"), b) for g in versions for b in g.get("builds") or []]
+          if not entries:
+              sys.exit("the manifest lists no builds")
+
+          latest = (doc.get("latest") or {}).get("release")
+          if latest not in {v for v, _ in entries}:
+              sys.exit("latest.release %r is not among the listed versions" % latest)
+
+          missing = []
+          for version, build in entries:
+              name = build.get("file")
+              for root in ("apr-emu", "."):
+                  if name and os.path.exists(os.path.join(root, name)):
+                      break
+              else:
+                  missing.append("%s (%s)" % (name, version))
+          if missing:
+              sys.exit("assets referenced but not in the repository:\n  " + "\n  ".join(missing))
+
+          print("manifest ok: %d builds across %d versions, latest release %s"
+                % (len(entries), len(versions), latest))
+          PY
+
+      - name: Stage the manifest on its own
+        run: |
+          mkdir -p site
+          cp apr_emu_manifest.json site/
+          ls -l site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
