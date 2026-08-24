@@ -41,8 +41,14 @@ jobs:
           if [ -z "$tag" ]; then
             tag=$(gh release view --json tagName --jq .tagName)
           fi
+          # The release date becomes last_update, so the manifest does not go stale.
+          date=$(gh release view "$tag" --json publishedAt --jq .publishedAt 2>/dev/null | cut -c1-10)
+          if [ -z "$date" ]; then
+            date=$(date -u +%F)
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "Describing release $tag"
+          echo "date=$date" >> "$GITHUB_OUTPUT"
+          echo "Describing release $tag from $date"
 
       - name: Fetch the payload from that release
         env:
@@ -77,6 +83,7 @@ jobs:
               entry["url"] = url
               entry["version"] = tag
               entry["checksum"] = checksum
+              entry["last_update"] = os.environ["RELEASE_DATE"]
 
           after = json.dumps(doc, indent=2) + "\n"
           with open(path, "w", encoding="utf-8", newline="\n") as handle:
@@ -91,6 +98,7 @@ jobs:
           PY
         env:
           TAG: ${{ steps.pick.outputs.tag }}
+          RELEASE_DATE: ${{ steps.pick.outputs.date }}
 
       - name: Commit the manifest
         if: steps.rewrite.outputs.changed == '1'

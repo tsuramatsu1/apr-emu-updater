@@ -35,7 +35,7 @@ jobs:
       - name: Check the manifest
         run: |
           python3 - <<'PY'
-          import hashlib, json, os, sys, urllib.request
+          import hashlib, json, os, re, sys, urllib.request
 
           path = "apr_emu_manifest.json"
           if not os.path.exists(path):
@@ -54,7 +54,8 @@ jobs:
           problems = []
           for index, entry in enumerate(payloads):
               label = entry.get("filename") or entry.get("name") or "entry %d" % index
-              for field in ("name", "filename", "url", "version", "checksum"):
+              for field in ("name", "filename", "url", "version", "checksum",
+                            "category", "last_update"):
                   if not entry.get(field):
                       problems.append("%s: %s is missing" % (label, field))
 
@@ -62,6 +63,11 @@ jobs:
               if checksum and (len(checksum) != 64 or
                                any(c not in "0123456789abcdefABCDEF" for c in checksum)):
                   problems.append("%s: checksum is not a sha256 hex digest" % label)
+
+              stamp = entry.get("last_update") or ""
+              if stamp and not re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$", stamp):
+                  problems.append(
+                      "%s: last_update should be YYYY-MM-DD, got %r" % (label, stamp))
 
               url = entry.get("url") or ""
               if "/blob/" in url:
