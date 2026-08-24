@@ -4,10 +4,10 @@
     {
       "name": "APR Emu Updater",
       "filename": "apr_emu_updater.elf",
-      "url": "https://github.com/tsuramatsu1/apr-emu-updater/releases/download/v1.4.1/apr_emu_updater.elf",
+      "url": "https://github.com/tsuramatsu1/apr-emu-updater/releases/download/v1.5.0/apr_emu_updater.elf",
       "description": "PS5 payload that keeps APR Emu up to date on installed titles",
-      "version": "v1.4.1",
-      "checksum": "692B4D09B2AF9CB8B4369DA982D510FB2D99EB4215691D07C90BE0F2CB22FC21"
+      "version": "v1.5.0",
+      "checksum": "08F520177BC5C6A03FE469A04A208C777312AD56C1EA6D26DB79CFD980C9AC3F"
     }
   ]
 }
