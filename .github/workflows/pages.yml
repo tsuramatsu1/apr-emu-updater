@@ -1,7 +1,7 @@
 name: Deploy manifest to Pages
 
-# Publishes apr_emu_manifest.json to GitHub Pages and nothing else, so the
-# payload can read the version list from a plain https host.
+# Publishes apr_emu_manifest.json to GitHub Pages and nothing else, so payload
+# loaders can read the list from a plain https host.
 
 on:
   push:
@@ -29,13 +29,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # A manifest that does not parse, or that names a build which is not in the
-      # repository, would leave every console unable to install. Catch it here
-      # rather than after it is live.
+      # A loader reads this to find and verify the payload, so a manifest that
+      # does not parse, or that advertises a checksum the file does not have,
+      # would send people a download they cannot use. Catch it before it is live.
       - name: Check the manifest
         run: |
           python3 - <<'PY'
-          import json, os, sys
+          import hashlib, json, os, sys, urllib.request
 
           path = "apr_emu_manifest.json"
           if not os.path.exists(path):
@@ -44,33 +44,54 @@ jobs:
           with open(path, encoding="utf-8") as handle:
               doc = json.load(handle)
 
-          if doc.get("builds") != "apr-emu":
-              sys.exit("not an apr-emu manifest: builds=%r" % doc.get("builds"))
-          if doc.get("buildsVersion") != 2:
-              sys.exit("unsupported buildsVersion: %r" % doc.get("buildsVersion"))
+          if not doc.get("name"):
+              sys.exit("the manifest has no name")
 
-          versions = doc.get("versions") or []
-          entries = [(g.get("version"), b) for g in versions for b in g.get("builds") or []]
-          if not entries:
-              sys.exit("the manifest lists no builds")
+          payloads = doc.get("payloads")
+          if not isinstance(payloads, list) or not payloads:
+              sys.exit("the manifest lists no payloads")
 
-          latest = (doc.get("latest") or {}).get("release")
-          if latest not in {v for v, _ in entries}:
-              sys.exit("latest.release %r is not among the listed versions" % latest)
+          problems = []
+          for index, entry in enumerate(payloads):
+              label = entry.get("filename") or entry.get("name") or "entry %d" % index
+              for field in ("name", "filename", "url", "version", "checksum"):
+                  if not entry.get(field):
+                      problems.append("%s: %s is missing" % (label, field))
 
-          missing = []
-          for version, build in entries:
-              name = build.get("file")
-              for root in ("apr-emu", "."):
-                  if name and os.path.exists(os.path.join(root, name)):
-                      break
-              else:
-                  missing.append("%s (%s)" % (name, version))
-          if missing:
-              sys.exit("assets referenced but not in the repository:\n  " + "\n  ".join(missing))
+              checksum = (entry.get("checksum") or "").strip()
+              if checksum and (len(checksum) != 64 or
+                               any(c not in "0123456789abcdefABCDEF" for c in checksum)):
+                  problems.append("%s: checksum is not a sha256 hex digest" % label)
 
-          print("manifest ok: %d builds across %d versions, latest release %s"
-                % (len(entries), len(versions), latest))
+              url = entry.get("url") or ""
+              if "/blob/" in url:
+                  problems.append(
+                      "%s: url points at a github page, which serves html rather than "
+                      "the file. Use the raw or releases/download form" % label)
+
+              # The manifest promises that this URL serves a file with this hash,
+              # so check the URL rather than a local copy: with a release-pinned or
+              # releases/latest URL the repository file is a different build.
+              if url and checksum and not problems:
+                  try:
+                      with urllib.request.urlopen(url, timeout=60) as response:
+                          served = hashlib.sha256(response.read()).hexdigest()
+                  except Exception as error:
+                      problems.append("%s: could not fetch %s (%s)" % (label, url, error))
+                  else:
+                      if served.lower() != checksum.lower():
+                          problems.append(
+                              "%s: checksum does not match what the url serves\n"
+                              "      manifest %s\n      served   %s"
+                              % (label, checksum.upper(), served.upper()))
+
+          if problems:
+              sys.exit("manifest problems:\n  " + "\n  ".join(problems))
+
+          print("manifest ok: %d payload(s)" % len(payloads))
+          for entry in payloads:
+              print("  %s %s -> %s" % (entry.get("filename"), entry.get("version"),
+                                       entry.get("url")))
           PY
 
       - name: Stage the manifest on its own

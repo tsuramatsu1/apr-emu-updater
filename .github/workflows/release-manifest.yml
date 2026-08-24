@@ -1,0 +1,114 @@
+name: Sync manifest to the latest release
+
+# Keeps apr_emu_manifest.json pointing at the newest release: the asset URL, the
+# version and the sha256 of the file that release actually serves. Runs when a
+# release is published, or by hand against any tag.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to sync (defaults to the latest release)
+        required: false
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: release-manifest
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Work out which release to describe
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          if [ -z "$tag" ]; then
+            tag="${{ github.event.inputs.tag }}"
+          fi
+          if [ -z "$tag" ]; then
+            tag=$(gh release view --json tagName --jq .tagName)
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Describing release $tag"
+
+      - name: Fetch the payload from that release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ steps.pick.outputs.tag }}" \
+            --pattern apr_emu_updater.elf --dir release --clobber
+          ls -l release/apr_emu_updater.elf
+
+      - name: Rewrite the manifest
+        id: rewrite
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+
+          tag = os.environ["TAG"]
+          asset = "apr_emu_updater.elf"
+          url = ("https://github.com/${{ github.repository }}"
+                 "/releases/download/%s/%s" % (tag, asset))
+          digest = hashlib.sha256(open(os.path.join("release", asset), "rb").read())
+          checksum = digest.hexdigest().upper()
+
+          path = "apr_emu_manifest.json"
+          with open(path, encoding="utf-8") as handle:
+              before = handle.read()
+          doc = json.loads(before)
+
+          entries = [e for e in doc.get("payloads") or [] if e.get("filename") == asset]
+          if not entries:
+              raise SystemExit("no payload entry for %s in %s" % (asset, path))
+          for entry in entries:
+              entry["url"] = url
+              entry["version"] = tag
+              entry["checksum"] = checksum
+
+          after = json.dumps(doc, indent=2) + "\n"
+          with open(path, "w", encoding="utf-8", newline="\n") as handle:
+              handle.write(after)
+
+          # Pinning the URL to the tag rather than releases/latest keeps the URL
+          # and the checksum describing the same bytes.
+          print("%s -> %s" % (asset, url))
+          print("checksum %s" % checksum)
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write("changed=%s\n" % ("1" if after != before else "0"))
+          PY
+        env:
+          TAG: ${{ steps.pick.outputs.tag }}
+
+      - name: Commit the manifest
+        if: steps.rewrite.outputs.changed == '1'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apr_emu_manifest.json
+          git commit -m "Point the manifest at ${{ steps.pick.outputs.tag }}"
+          git push origin HEAD:main
+
+      # A push made with the default token does not start other workflows, so the
+      # Pages deploy is asked for explicitly rather than waiting on the push.
+      - name: Deploy the manifest to Pages
+        if: steps.rewrite.outputs.changed == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main
+
+      - name: Nothing to do
+        if: steps.rewrite.outputs.changed != '1'
+        run: echo "The manifest already describes ${{ steps.pick.outputs.tag }}."
