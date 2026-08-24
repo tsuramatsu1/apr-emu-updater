@@ -3,10 +3,27 @@
   "buildsVersion": 2,
   "repository": "https://github.com/tsuramatsu1/apr-emu-updater",
   "latest": {
-    "release": "0.3.6.5-512kb",
-    "debug": "0.3.6.4"
+    "release": "0.3.6.6",
+    "debug": "0.3.6.6"
   },
   "versions": [
+    {
+      "version": "0.3.6.6",
+      "builds": [
+        {
+          "build": "release",
+          "file": "libSceAmpr.sprx-0.3.6.6",
+          "bytes": 255126,
+          "sha256": "362c84e31e3a06a42f50fe4d6ea124d15e73f77c901470f90823935d7f36ca76"
+        },
+        {
+          "build": "debug",
+          "file": "libSceAmpr.sprx-0.3.6.6-debug",
+          "bytes": 414614,
+          "sha256": "27dec32b11d125d685b06702ae2b7fcb740dad0fe11b8b530921793515593aa9"
+        }
+      ]
+    },
     {
       "version": "0.3.6.5-512kb",
       "builds": [
