@@ -25,7 +25,7 @@ pick the version each game should use.
 
 - A jailbroken ps5 with an ELF loader listening on port 9021.
 - **NanoDNS** must be running.
-- **ShadowMountPlus** for games installed as image files.
+- **ShadowMountPlus1.6beta16** for games installed as image files.
 - **APR Emu Updater** must remain loaded at all times. Add it to your payload
   autoloader, or send it manually before starting a game. No need to open the app
   tile, the updated apr-emu will be remounted when the payload is active.
