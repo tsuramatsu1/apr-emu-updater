@@ -215,6 +215,17 @@
       ]
     },
     {
+      "version": "0.3.1",
+      "builds": [
+        {
+          "build": "release",
+          "file": "libSceAmpr.sprx-0.3.1",
+          "bytes": 202502,
+          "sha256": "0bcbf24701625d4116780a96d8b391d93c46d9f102959fcae2763d98a0f4f7ba"
+        }
+      ]
+    },
+    {
       "version": "0.3.0",
       "builds": [
         {
