@@ -2,7 +2,7 @@
   <img src="./assets/banner.png" alt="APR Emu Updater" width="100%">
 </p>
 
-# APR Emu Updater v2.0.3
+# APR Emu Updater v2.0.6
 
 Some games on a jailbroken ps5 rely on a file called **APR Emu**
 (`libSceAmpr.sprx`). Different games run best with different versions of it, and
@@ -43,7 +43,7 @@ config** tab.
 
 ## How to use it
 
-**Send `apr_emu_updater.elf` to your ps5**, port 9021, with whatever you normally
+**Send `apr_emu_updater_v2.0.6.elf` to your ps5**, port 9021, with whatever you normally
 use to send payloads. The ps5 shows:
 
 ```text

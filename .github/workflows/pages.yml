@@ -49,7 +49,8 @@ jobs:
                        % type(doc).__name__)
 
           FIELDS = ("name", "filename", "url", "source", "source_direct",
-                    "description", "last_update", "version", "category")
+                    "description", "last_update", "version", "category",
+                    "checksum")
           CATEGORIES = ("Loaders", "Networking & Servers", "System & Jailbreak",
                         "Utilities & Tools")
 
@@ -77,6 +78,23 @@ jobs:
                   problems.append("%s: last_update should be YYYY-MM-DD, got %r"
                                   % (label, stamp))
 
+              # The manager tells Install from Update by name: it strips a trailing
+              # _v<version> off the manifest filename and off every installed file,
+              # then offers Update when a same-stem file is installed under another
+              # name. An unversioned filename always looks already installed, so the
+              # Update button never appears and users have to uninstall by hand.
+              name = entry.get("filename") or ""
+              if name and not re.search(r"[_-]v?[0-9]", os.path.splitext(name)[0]):
+                  problems.append(
+                      "%s: filename carries no version, so the manager would never "
+                      "offer it as an update. Use %s_<version>.elf"
+                      % (label, os.path.splitext(name)[0]))
+
+              checksum = (entry.get("checksum") or "").strip()
+              if checksum and not re.match(r"^[0-9a-f]{64}$", checksum):
+                  problems.append("%s: checksum should be 64 lowercase hex "
+                                  "characters, got %r" % (label, checksum))
+
               for field in ("url", "source_direct"):
                   value = entry.get(field) or ""
                   if "/blob/" in value:
@@ -85,12 +103,15 @@ jobs:
                           "than the file. Use the releases/download form"
                           % (label, field))
 
-              # There is no checksum field in this format, so integrity is checked
-              # here: whatever the url serves must be the payload in this repo.
-              local = entry.get("filename")
+              if name and entry.get("url") and not entry["url"].endswith("/" + name):
+                  problems.append("%s: url does not end in the filename it declares"
+                                  % label)
+
+              # checksum is what the manager verifies before installing, so it is
+              # the anchor here: the url has to serve those bytes, and the build in
+              # this repo has to be those bytes.
               url = entry.get("url") or ""
-              if url and local and os.path.exists(local) and not problems:
-                  want = hashlib.sha256(open(local, "rb").read()).hexdigest()
+              if url and checksum and not problems:
                   try:
                       with urllib.request.urlopen(url, timeout=60) as response:
                           served = hashlib.sha256(response.read()).hexdigest()
@@ -98,11 +119,23 @@ jobs:
                       problems.append("%s: could not fetch %s (%s)"
                                       % (label, url, error))
                   else:
-                      if served != want:
+                      if served != checksum:
                           problems.append(
-                              "%s: the url does not serve the payload in this repo\n"
-                              "      repo   %s\n      served %s"
-                              % (label, want.upper(), served.upper()))
+                              "%s: the url does not serve the bytes the checksum "
+                              "declares\n      manifest %s\n      served   %s"
+                              % (label, checksum.upper(), served.upper()))
+
+                  # The build lives here unversioned; releases carry the version.
+                  local = re.sub(r"[_-]v?[0-9][0-9a-z.-]*$", "",
+                                 os.path.splitext(name)[0]) + os.path.splitext(name)[1]
+                  if os.path.exists(local):
+                      built = hashlib.sha256(open(local, "rb").read()).hexdigest()
+                      if built != checksum:
+                          problems.append(
+                              "%s: %s in this repo is not what the manifest "
+                              "describes. Publish it as a release first\n"
+                              "      manifest %s\n      repo     %s"
+                              % (label, local, checksum.upper(), built.upper()))
 
           if problems:
               sys.exit("manifest problems:\n  " + "\n  ".join(problems))

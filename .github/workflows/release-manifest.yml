@@ -1,8 +1,15 @@
 name: Sync manifest to the latest release
 
-# Keeps apr_emu_manifest.json pointing at the newest release: the asset URL, the
-# version and the sha256 of the file that release actually serves. Runs when a
-# release is published, or by hand against any tag.
+# Keeps apr_emu_manifest.json pointing at the newest release: the asset name, the
+# URL, the version and the sha256 of the file that release actually serves. Runs
+# when a release is published, or by hand against any tag.
+#
+# PS5 Payload Manager decides between Install and Update from the asset NAME, not
+# from the version field. It strips a trailing _v<version> off both the manifest
+# filename and every installed file, and offers Update when a file with the same
+# stem is installed under a different name. A constant filename therefore always
+# reads as already installed and never offers an update, so the release asset has
+# to carry its version and this workflow refuses a release where it does not.
 
 on:
   release:
@@ -51,22 +58,39 @@ jobs:
           echo "Describing release $tag from $date"
 
       - name: Fetch the payload from that release
+        id: asset
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.pick.outputs.tag }}
         run: |
-          gh release download "${{ steps.pick.outputs.tag }}" \
-            --pattern apr_emu_updater.elf --dir release --clobber
-          ls -l release/apr_emu_updater.elf
+          name=$(gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^apr_emu_updater.*\.elf$' | head -n 1)
+          if [ -z "$name" ]; then
+            echo "::error::$TAG has no apr_emu_updater*.elf asset"
+            exit 1
+          fi
+          # The manager reads the version off the asset name. Without one every
+          # release installs over the same filename and Update is never offered.
+          if ! printf '%s' "$name" | grep -qE '[_-]v?[0-9]'; then
+            echo "::error::asset $name carries no version, so PS5 Payload Manager would never offer it as an update. Name it apr_emu_updater_$TAG.elf"
+            exit 1
+          fi
+          gh release download "$TAG" --pattern "$name" --dir release --clobber
+          sum=$(sha256sum "release/$name" | cut -d' ' -f1)
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "checksum=$sum" >> "$GITHUB_OUTPUT"
+          ls -l "release/$name"
+          echo "$name sha256 $sum"
 
       - name: Rewrite the manifest
         id: rewrite
         run: |
           python3 - <<'PY'
-          import json, os
+          import json, os, re
 
           tag = os.environ["TAG"]
           stamp = os.environ["RELEASE_DATE"]
-          asset = "apr_emu_updater.elf"
+          asset = os.environ["ASSET"]
+          checksum = os.environ["CHECKSUM"]
           repo = "${{ github.repository }}"
           url = "https://github.com/%s/releases/download/%s/%s" % (repo, tag, asset)
 
@@ -77,29 +101,38 @@ jobs:
           if not isinstance(doc, list):
               raise SystemExit("%s should be an array of payload entries" % path)
 
-          entries = [e for e in doc if e.get("filename") == asset]
+          # The filename moves with every release, so an entry is matched on the
+          # stem the manager itself keys on rather than on the whole name.
+          def stem(name):
+              return re.sub(r"[_-]v?[0-9][0-9a-z.-]*$", "", os.path.splitext(name)[0])
+
+          entries = [e for e in doc if stem(e.get("filename", "")) == stem(asset)]
           if not entries:
-              raise SystemExit("no entry for %s in %s" % (asset, path))
+              raise SystemExit("no entry for %s in %s" % (stem(asset), path))
           for entry in entries:
+              entry["filename"] = asset
               entry["url"] = url
               entry["source_direct"] = url
               entry["source"] = "https://github.com/%s/releases" % repo
               entry["version"] = tag
               entry["last_update"] = stamp
+              entry["checksum"] = checksum
 
           after = json.dumps(doc, indent=2) + "\n"
           with open(path, "w", encoding="utf-8", newline="\n") as handle:
               handle.write(after)
 
-          # Pinning to the tag rather than releases/latest keeps url, version and
-          # last_update describing the same release.
-          print("%s %s (%s) -> %s" % (asset, tag, stamp, url))
+          # Pinning to the tag rather than releases/latest keeps filename, url,
+          # version, checksum and last_update describing the same release.
+          print("%s %s (%s) sha256 %s -> %s" % (asset, tag, stamp, checksum, url))
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
               out.write("changed=%s\n" % ("1" if after != before else "0"))
           PY
         env:
           TAG: ${{ steps.pick.outputs.tag }}
           RELEASE_DATE: ${{ steps.pick.outputs.date }}
+          ASSET: ${{ steps.asset.outputs.name }}
+          CHECKSUM: ${{ steps.asset.outputs.checksum }}
 
       - name: Commit the manifest
         if: steps.rewrite.outputs.changed == '1'
